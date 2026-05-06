@@ -12,10 +12,10 @@ frontend/dist/
 build/
 
 # Environment variables (Crucial for security)
-backend/.env
+api/.env
+.env
 .env.local
 .env.*.local
-backend/.env
 
 # IDE / Editor folders
 .vscode/

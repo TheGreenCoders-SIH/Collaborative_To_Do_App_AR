@@ -253,23 +253,16 @@ io.on('connection', (socket) => {
   });
 });
 
-async function startServer() {
-  try {
-    const client = await pool.connect();
-    console.log('Database connection verified');
-    client.release();
+// For Vercel Serverless Functions: 
+// We export the app and let Vercel handle the invocation.
+// Note: WebSockets (socket.io) will not work on standard Vercel serverless functions.
+// For real-time features, you would need a persistent server (e.g., Render, Railway) or a dedicated provider (Pusher).
 
-    await initializeDatabase();
-    console.log('Database schema ready');
+// Run database initialization
+initializeDatabase().then(() => {
+  console.log('Database schema ready');
+}).catch(err => {
+  console.error('Database initialization failed:', err.message);
+});
 
-    server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`WebSocket server on ws://localhost:${PORT}`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error.message);
-    process.exit(1);
-  }
-}
-
-startServer();
+module.exports = app;
