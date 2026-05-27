@@ -368,7 +368,7 @@ class _MessagingScreenState extends State<MessagingScreen> with SingleTickerProv
   Widget _buildDmsTab() {
     final query = _searchController.text.toLowerCase();
     final filteredDMs = _dmChats.where((dm) {
-      final name = (dm['user_name'] ?? '').toLowerCase();
+      final name = (dm['other_user_name'] ?? '').toLowerCase();
       return name.contains(query);
     }).toList();
 
@@ -377,7 +377,6 @@ class _MessagingScreenState extends State<MessagingScreen> with SingleTickerProv
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currentUserId = Provider.of<AuthProvider>(context, listen: false).id;
 
     return ListView.builder(
       itemCount: filteredDMs.length,
@@ -385,11 +384,11 @@ class _MessagingScreenState extends State<MessagingScreen> with SingleTickerProv
       itemBuilder: (context, index) {
         final dm = filteredDMs[index];
         
-        // Find other participant name
-        final otherUser = dm['user1_id'] == currentUserId ? dm['user2'] : dm['user1'];
-        final name = otherUser != null ? (otherUser['name'] ?? 'Friend') : (dm['user_name'] ?? 'Secure DM');
-        final otherPublicKey = otherUser != null ? otherUser['public_key'] : null;
-        final otherId = otherUser != null ? otherUser['id'] : null;
+        // Find other participant name directly from the backend flat columns
+        final name = dm['other_user_name'] ?? 'Secure DM';
+        final otherPublicKey = dm['other_user_public_key'] as String?;
+        final otherId = dm['other_user_id'] as int?;
+        final otherAvatar = dm['other_user_avatar'] as String?;
         
         final initials = name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase();
 
@@ -405,10 +404,10 @@ class _MessagingScreenState extends State<MessagingScreen> with SingleTickerProv
             leading: CircleAvatar(
               radius: 20,
               backgroundColor: AppColors.primaryCyan.withOpacity(0.2),
-              backgroundImage: otherUser != null && otherUser['avatar_url'] != null
-                  ? NetworkImage(otherUser['avatar_url'])
+              backgroundImage: otherAvatar != null && otherAvatar.isNotEmpty
+                  ? NetworkImage(otherAvatar)
                   : null,
-              child: otherUser == null || otherUser['avatar_url'] == null
+              child: otherAvatar == null || otherAvatar.isEmpty
                   ? Text(
                       initials.isNotEmpty ? initials : 'U',
                       style: GoogleFonts.outfit(color: AppColors.primaryCyan, fontWeight: FontWeight.bold, fontSize: 13),

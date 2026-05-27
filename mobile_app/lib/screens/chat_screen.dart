@@ -69,7 +69,7 @@ class _ChatScreenState extends State<ChatScreen> {
         // Mark all unread received messages as read
         final currentUserId = Provider.of<AuthProvider>(context, listen: false).id;
         for (var msg in fetchedMessages) {
-          if (msg['sender_id'] != currentUserId && msg['is_read'] != true) {
+          if (msg['sender_id'] != currentUserId && msg['status'] != 'read') {
             ApiService.markMessageRead(msg['id']).catchError((e) => print('Error marking read: $e'));
           }
         }
@@ -407,9 +407,9 @@ class _ChatScreenState extends State<ChatScreen> {
               if (isMe && !_chatArgs!['isTeam']) ...[
                 const SizedBox(width: 4),
                 Icon(
-                  msg['is_read'] == true ? Icons.done_all : Icons.done,
+                  msg['status'] == 'read' ? Icons.done_all : Icons.done,
                   size: 13,
-                  color: msg['is_read'] == true ? AppColors.primaryCyan : AppColors.darkTextSecondary,
+                  color: msg['status'] == 'read' ? AppColors.primaryCyan : AppColors.darkTextSecondary,
                 ),
               ],
             ],
