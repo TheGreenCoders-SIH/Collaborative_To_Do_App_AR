@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run frontend\" \"npm run backend\"",
+    "frontend": "vite",
+    "backend": "node api/index.cjs",
     "build": "vite build",
-    "preview": "vite preview",
-    "backend": "node api/index.js"
+    "preview": "vite preview"
   },
   "dependencies": {
+    "concurrently": "^8.2.2",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

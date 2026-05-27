@@ -35,6 +35,10 @@ router.post('/conversations', authenticate, async (req, res) => {
     // Ensure user_id_1 < user_id_2 for unique constraint
     const [smaller, larger] = user_id_1 < user_id_2 ? [user_id_1, user_id_2] : [user_id_2, user_id_1];
 
+    // Fetch other user's details for metadata
+    const otherUserResult = await pool.query('SELECT name, avatar_url, public_key, user_id FROM users WHERE id = $1', [user_id_2]);
+    const otherUser = otherUserResult.rows[0];
+
     // Check if conversation exists
     const existingConv = await pool.query(
       'SELECT * FROM conversations WHERE user_id_1 = $1 AND user_id_2 = $2',
@@ -42,7 +46,15 @@ router.post('/conversations', authenticate, async (req, res) => {
     );
 
     if (existingConv.rows.length > 0) {
-      return res.json({ conversation: existingConv.rows[0] });
+      const conversation = {
+        ...existingConv.rows[0],
+        other_user_id: user_id_2,
+        other_user_name: otherUser.name,
+        other_user_avatar: otherUser.avatar_url,
+        other_user_uid: otherUser.user_id,
+        other_user_public_key: otherUser.public_key
+      };
+      return res.json({ conversation });
     }
 
     // Create new conversation
@@ -51,7 +63,16 @@ router.post('/conversations', authenticate, async (req, res) => {
       [smaller, larger]
     );
 
-    res.status(201).json({ conversation: result.rows[0] });
+    const conversation = {
+      ...result.rows[0],
+      other_user_id: user_id_2,
+      other_user_name: otherUser.name,
+      other_user_avatar: otherUser.avatar_url,
+      other_user_uid: otherUser.user_id,
+      other_user_public_key: otherUser.public_key
+    };
+
+    res.status(201).json({ conversation });
   } catch (error) {
     console.error('Error creating conversation:', error.message);
     res.status(500).json({ error: 'Failed to create conversation' });
@@ -69,6 +90,7 @@ router.get('/conversations', authenticate, async (req, res) => {
               CASE WHEN c.user_id_1 = $1 THEN u2.name ELSE u1.name END as other_user_name,
               CASE WHEN c.user_id_1 = $1 THEN u2.avatar_url ELSE u1.avatar_url END as other_user_avatar,
               CASE WHEN c.user_id_1 = $1 THEN u2.user_id ELSE u1.user_id END as other_user_uid,
+              CASE WHEN c.user_id_1 = $1 THEN u2.public_key ELSE u1.public_key END as other_user_public_key,
               (SELECT encrypted_content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
               (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_time
        FROM conversations c
@@ -129,7 +151,7 @@ router.get('/conversations/:conversationId/messages', authenticate, async (req, 
 
 // Send a message
 router.post('/messages', authenticate, async (req, res) => {
-  const { conversation_id, encrypted_content } = req.body;
+  const { conversation_id, encrypted_content, nonce } = req.body;
   const sender_id = req.user.id;
 
   if (!conversation_id || !encrypted_content) {
@@ -147,12 +169,12 @@ router.post('/messages', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    // Create message
+    // Create message with nonce
     const result = await pool.query(
-      `INSERT INTO messages (conversation_id, sender_id, encrypted_content, status) 
-       VALUES ($1, $2, $3, $4) 
+      `INSERT INTO messages (conversation_id, sender_id, encrypted_content, nonce, status) 
+       VALUES ($1, $2, $3, $4, $5) 
        RETURNING *`,
-      [conversation_id, sender_id, encrypted_content, 'sent']
+      [conversation_id, sender_id, encrypted_content, nonce || null, 'sent']
     );
 
     // Update conversation updated_at

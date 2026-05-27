@@ -5,7 +5,7 @@ import { useTeam } from '../hooks/useTeam';
 import { useTheme } from '../context/ThemeContext';
 import { Button, Input, Modal } from '../components/common';
 import Sidebar from '../components/common/Sidebar';
-import { HiChevronLeft, HiPlus, HiCheckCircle, HiClock } from 'react-icons/hi';
+import { HiChevronLeft, HiPlus, HiCheckCircle, HiClock, HiTrash } from 'react-icons/hi';
 
 const PersonalTasksPage = () => {
   const { user } = useAuth();
@@ -70,6 +70,12 @@ const PersonalTasksPage = () => {
     setTasks([...tasks, newTask]);
     setNewTaskTitle('');
     setShowAddModal(false);
+  };
+
+  const deletePersonalTask = (taskId) => {
+    if (window.confirm('Delete this task?')) {
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+    }
   };
 
   const selectedDateTasks = selectedDate ? getTasksForDate(parseInt(selectedDate.split('-')[2])) : [];
@@ -299,6 +305,16 @@ const PersonalTasksPage = () => {
                         <span className={`flex-1 text-sm ${task.completed ? 'line-through' : ''} ${textClass}`}>
                           {task.title}
                         </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deletePersonalTask(task.id);
+                          }}
+                          className="text-red-500 hover:text-red-600 p-1 rounded-lg transition-colors"
+                          title="Delete Task"
+                        >
+                          <HiTrash size={16} />
+                        </button>
                       </div>
                     ))
                   )}

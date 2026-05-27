@@ -3,7 +3,13 @@ const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
 const passport = require('passport');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+console.log('🔑 GOOGLE_CLIENT_ID present:', !!process.env.GOOGLE_CLIENT_ID);
+if (!process.env.GOOGLE_CLIENT_ID) {
+  console.log('⚠️ Warning: GOOGLE_CLIENT_ID is missing from process.env');
+  console.log('   Looking in:', path.join(__dirname, '.env'));
+}
 
 const app = express();
 
@@ -40,16 +46,23 @@ const activityRoutes = require('./routes/activity');
 const messageRoutes = require('./routes/messages');
 const channelRoutes = require('./routes/channels');
 
-app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
-app.use('/friends', friendRoutes);
-app.use('/teams', teamRoutes);
-app.use('/', taskRoutes);  // Mount at root so /teams/:teamId/tasks and /tasks/:id work correctly
-app.use('/comments', commentRoutes);
-app.use('/attachments', attachmentRoutes);
-app.use('/', activityRoutes);  // Mount at root so /teams/:teamId/metrics and /teams/:teamId/activity work correctly
-app.use('/', channelRoutes);  // Mount at root so /teams/:teamId/channels and /channels/:channelId/* work correctly
-app.use('/messages', messageRoutes);
+// Consolidation of routes for Vercel/Local compatibility
+const apiRouter = express.Router();
+
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/users', userRoutes);
+apiRouter.use('/friends', friendRoutes);
+apiRouter.use('/teams', teamRoutes);
+apiRouter.use('/', taskRoutes);
+apiRouter.use('/comments', commentRoutes);
+apiRouter.use('/attachments', attachmentRoutes);
+apiRouter.use('/', activityRoutes);
+apiRouter.use('/', channelRoutes);
+apiRouter.use('/messages', messageRoutes);
+
+// Mount the router at both /api (for Vercel) and / (for local proxy/direct access)
+app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 console.log('\n✅ API Routes Configured:');
 console.log('   Auth: /auth/*');

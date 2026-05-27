@@ -129,7 +129,7 @@ export const messaging = {
   getConversations: () => api.get('/messages/conversations'),
   createConversation: (userId) => api.post('/messages/conversations', { user_id_2: userId }),
   getMessages: (conversationId, limit = 100) => api.get(`/messages/conversations/${conversationId}/messages?limit=${limit}`),
-  sendMessage: (conversationId, content) => api.post('/messages/messages', { conversation_id: conversationId, encrypted_content: content }),
+  sendMessage: (conversationId, content, nonce) => api.post('/messages/messages', { conversation_id: conversationId, encrypted_content: content, nonce }),
   markRead: (messageId) => api.post(`/messages/messages/${messageId}/read`),
   getTeamMessages: (teamId, limit = 100) => api.get(`/messages/team/${teamId}?limit=${limit}`),
   sendTeamMessage: (teamId, content) => api.post(`/messages/team/${teamId}`, { content }),

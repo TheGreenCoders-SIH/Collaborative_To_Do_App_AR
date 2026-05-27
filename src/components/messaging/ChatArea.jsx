@@ -5,6 +5,7 @@ import { messaging } from '../../utils/api';
 import { HiPaperClip, HiPhotograph, HiEmojiHappy, HiPaperAirplane, HiSearch, HiPhone, HiVideoCamera, HiUserGroup, HiChevronLeft, HiX } from 'react-icons/hi';
 import { Modal } from '../common';
 import EmojiPicker from 'emoji-picker-react';
+import { encryptMessage, decryptMessage } from '../../utils/encryption';
 
 export default function ChatArea({ activeChat, currentUser, socket, onBack, showRightSidebar, onToggleRightSidebar }) {
   const [messages, setMessages] = useState([]);
@@ -21,6 +22,7 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
   const [showCallModal, setShowCallModal] = useState(false);
   const [callType, setCallType] = useState('audio');
   const [aliasName, setAliasName] = useState('');
+  const [conversationPublicKey, setConversationPublicKey] = useState(null);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -28,6 +30,25 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
   const messagesContainerRef = useRef(null);
   const activeChatIdRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  const getDecryptedContent = (msg) => {
+    if (msg.content) return msg.content;
+    if (!msg.encrypted_content) return '';
+    if (activeChat?.type === 'team') return msg.encrypted_content;
+    
+    try {
+      const mySecretKey = localStorage.getItem('secretKey');
+      const otherUserPublicKey = activeChat?.publicKey || activeChat?.public_key || conversationPublicKey || msg.sender_public_key;
+      
+      if (mySecretKey && otherUserPublicKey && msg.nonce) {
+        return decryptMessage(msg.nonce, msg.encrypted_content, otherUserPublicKey, mySecretKey);
+      }
+    } catch (e) {
+      console.error('Decryption failed for msg', msg.id, e.message);
+      return '[Decryption Failed]';
+    }
+    return msg.encrypted_content;
+  };
 
   // Keep activeChat.id in ref
   useEffect(() => {
@@ -71,10 +92,12 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
     setLoading(true);
     setMessages([]);
     setError('');
+    setConversationPublicKey(null);
     try {
       const { data: convData } = await messaging.createConversation(userId);
       const convId = convData.conversation.id;
       setConversationId(convId);
+      setConversationPublicKey(convData.conversation.other_user_public_key);
 
       const { data: msgsData } = await messaging.getMessages(convId);
       const sorted = msgsData.messages.sort((a, b) =>
@@ -140,8 +163,8 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
           return [...prev, {
             id: data.messageId,
             sender_id: data.senderId,
-            content: data.encryptedContent,
             encrypted_content: data.encryptedContent,
+            nonce: data.nonce,
             created_at: data.timestamp,
             status: 'delivered'
           }];
@@ -155,6 +178,22 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
       }
     };
 
+    const onDelivered = (data) => {
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === data.messageId ? { ...msg, status: 'delivered' } : msg
+        )
+      );
+    };
+
+    const onRead = (data) => {
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === data.messageId ? { ...msg, status: 'read' } : msg
+        )
+      );
+    };
+
     const onTyping = (data) => {
       if (data.conversationId === conversationId) {
         setRemoteTyping(data.isTyping);
@@ -163,9 +202,13 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
     };
 
     socket.on('message:received', onReceived);
+    socket.on('message:delivered', onDelivered);
+    socket.on('message:read', onRead);
     socket.on('user:typing:status', onTyping);
     return () => {
       socket.off('message:received', onReceived);
+      socket.off('message:delivered', onDelivered);
+      socket.off('message:read', onRead);
       socket.off('user:typing:status', onTyping);
     };
   }, [socket, activeChat, conversationId, aliasName]);
@@ -209,6 +252,59 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
       socket.off('team:typing:status', onTeamTyping);
     };
   }, [socket, activeChat?.id, activeChat?.type]);
+
+  // Polling fallback when socket is disconnected or not present (useful on Vercel deployment)
+  useEffect(() => {
+    if (!activeChat) return;
+
+    const pollForMessages = async () => {
+      try {
+        if (activeChat.type === 'team') {
+          const { data } = await messaging.getTeamMessages(activeChat.id);
+          const sorted = (data.messages || []).sort((a, b) =>
+            new Date(a.created_at) - new Date(b.created_at)
+          );
+          setMessages(prev => {
+            const hasNew = prev.length !== sorted.length || prev.some((m, idx) => sorted[idx] && m.id !== sorted[idx].id);
+            if (hasNew) {
+              return sorted;
+            }
+            return prev;
+          });
+        } else if (activeChat.type === 'dm' && conversationId) {
+          const { data } = await messaging.getMessages(conversationId);
+          const sorted = (data.messages || []).sort((a, b) =>
+            new Date(a.created_at) - new Date(b.created_at)
+          );
+          setMessages(prev => {
+            const hasNew = prev.length !== sorted.length || prev.some((m, idx) => sorted[idx] && m.id !== sorted[idx].id);
+            const hasStatusChange = prev.some((m, idx) => sorted[idx] && m.status !== sorted[idx].status);
+            if (hasNew || hasStatusChange) {
+              return sorted;
+            }
+            return prev;
+          });
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    };
+
+    // Run immediately when activeChat/conversationId changes
+    const isSocketConnected = socket && socket.connected;
+    if (!isSocketConnected) {
+      pollForMessages();
+    }
+
+    const pollInterval = setInterval(() => {
+      const isSocketConnected = socket && socket.connected;
+      if (!isSocketConnected) {
+        pollForMessages();
+      }
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [activeChat?.id, activeChat?.type, conversationId, socket, socket?.connected]);
 
   const handleSend = async () => {
     if (!input.trim() || !activeChat) return;
@@ -273,26 +369,49 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
       id: tempId,
       sender_id: currentUser.id,
       content: text,
-      encrypted_content: text,
       created_at: new Date().toISOString(),
-      status: 'sent'
+      status: 'sending'
     }]);
 
+    let ciphertext = text;
+    let nonce = '';
+
     try {
-      const { data } = await messaging.sendMessage(convId, text);
-      setMessages(prev => prev.map(m => m.id === tempId ? { ...data.message, content: text } : m));
+      const mySecretKey = localStorage.getItem('secretKey');
+      const otherUserPublicKey = activeChat.publicKey || activeChat.public_key || conversationPublicKey;
+
+      if (mySecretKey && otherUserPublicKey) {
+        const encrypted = encryptMessage(text, otherUserPublicKey, mySecretKey);
+        ciphertext = encrypted.ciphertext;
+        nonce = encrypted.nonce;
+      } else {
+        console.warn('🔑 E2EE keys missing. Sending message in plaintext.');
+      }
+    } catch (err) {
+      console.error('Encryption failed, falling back to plaintext:', err);
+    }
+
+    try {
+      const { data } = await messaging.sendMessage(convId, ciphertext, nonce);
+      setMessages(prev => prev.map(m => m.id === tempId ? { 
+        ...data.message, 
+        content: text,
+        nonce,
+        sender_public_key: currentUser.public_key
+      } : m));
 
       socket?.emit('message:send', {
         messageId: data.message.id,
         conversationId: convId,
         senderId: currentUser.id,
         recipientId: activeChat.id,
-        encryptedContent: text,
-        nonce: ''
+        encryptedContent: ciphertext,
+        nonce: nonce
       });
     } catch (err) {
       console.error('Send DM failed:', err);
       setMessages(prev => prev.filter(m => m.id !== tempId));
+      setError('Failed to send message.');
     }
   };
 
@@ -428,7 +547,7 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
   // Search Filtering
   const filteredMessages = messages.filter(msg => {
     if (!searchQuery.trim()) return true;
-    const content = msg.content || msg.encrypted_content || '';
+    const content = getDecryptedContent(msg);
     return content.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
@@ -549,7 +668,7 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
               const msg = item;
               const isMine = msg.sender_id === currentUser?.id;
               const isFriend = msg.sender_id === activeChat.id;
-              let displayContent = msg.content || msg.encrypted_content || '';
+              let displayContent = getDecryptedContent(msg);
               
               let fileAttachment = null;
               if (displayContent.includes('[FILE|*|')) {

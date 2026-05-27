@@ -140,7 +140,7 @@ router.get('/', authenticate, async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT f.id as friendship_id, f.created_at as friends_since,
-              u.id, u.email, u.name, u.user_id, u.avatar_url, u.bio
+              u.id, u.email, u.name, u.user_id, u.avatar_url, u.bio, u.public_key
        FROM friendships f
        JOIN users u ON (
          CASE WHEN f.requester_id = $1 THEN f.addressee_id ELSE f.requester_id END = u.id

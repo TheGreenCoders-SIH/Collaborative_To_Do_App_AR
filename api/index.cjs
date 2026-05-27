@@ -261,6 +261,13 @@ io.on('connection', (socket) => {
 // Run database initialization
 initializeDatabase().then(() => {
   console.log('Database schema ready');
+
+  // Start the server for local development if run directly
+  if (require.main === module || !process.env.VERCEL) {
+    server.listen(PORT, () => {
+      console.log(`Backend server running on port ${PORT}`);
+    });
+  }
 }).catch(err => {
   console.error('Database initialization failed:', err.message);
 });

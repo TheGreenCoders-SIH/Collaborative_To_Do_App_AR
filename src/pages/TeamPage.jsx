@@ -22,7 +22,7 @@ const TeamPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isDarkMode } = useTheme();
-  const { teams, currentTeam, tasks, selectTeam, createTask, updateTaskStatus, refreshTasks, addMember } = useTeam();
+  const { teams, currentTeam, tasks, selectTeam, createTask, updateTaskStatus, refreshTasks, addMember, deleteTask } = useTeam();
   const { updates } = usePolling(id);
 
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -35,6 +35,7 @@ const TeamPage = () => {
   const [taskComments, setTaskComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [selectedTeam, setSelectedTeam] = useState(id);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -51,12 +52,16 @@ const TeamPage = () => {
 
   const handleCreateTask = async (e) => {
     e.preventDefault();
+    if (isCreatingTask) return;
+    setIsCreatingTask(true);
     try {
       await createTask(id, taskForm);
       setShowTaskModal(false);
       setTaskForm({ title: '', description: '', deadline: '' });
     } catch (error) {
       alert('Failed to create task');
+    } finally {
+      setIsCreatingTask(false);
     }
   };
 
@@ -101,6 +106,18 @@ const TeamPage = () => {
       setNewComment('');
     } catch (error) {
       alert('Failed to add comment');
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (window.confirm('Are you sure you want to delete this task?')) {
+      try {
+        await deleteTask(taskId);
+        setShowTaskDetail(false);
+        setSelectedTask(null);
+      } catch (error) {
+        alert('Failed to delete task');
+      }
     }
   };
 
@@ -304,9 +321,10 @@ const TeamPage = () => {
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium hover:shadow-glow transition-all"
+              disabled={isCreatingTask}
+              className="flex-1 py-2 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium hover:shadow-glow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create Task
+              {isCreatingTask ? 'Creating...' : 'Create Task'}
             </button>
           </div>
         </form>
@@ -407,6 +425,17 @@ const TeamPage = () => {
                   Add
                 </button>
               </div>
+            </div>
+            
+            {/* Delete Task */}
+            <div className={`border-t ${borderClass} pt-4 flex justify-end`}>
+              <button
+                type="button"
+                onClick={() => handleDeleteTask(selectedTask.id)}
+                className="px-4 py-2 bg-red-500/10 text-red-500 font-medium rounded-xl hover:bg-red-500 hover:text-white transition-all flex items-center gap-2 text-sm"
+              >
+                Delete Task
+              </button>
             </div>
           </div>
         )}

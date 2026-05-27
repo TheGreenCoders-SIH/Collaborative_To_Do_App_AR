@@ -29,6 +29,9 @@ export const AuthProvider = ({ children }) => {
       console.log('Login successful:', data);
       localStorage.setItem('token', data.token);
       localStorage.setItem('refreshToken', data.refreshToken);
+      if (data.user?.secret_key) {
+        localStorage.setItem('secretKey', data.user.secret_key);
+      }
       setUser(data.user);
       return data;
     } catch (error) {
@@ -42,6 +45,9 @@ export const AuthProvider = ({ children }) => {
     const { data } = await auth.register({ email, name, password });
     localStorage.setItem('token', data.token);
     localStorage.setItem('refreshToken', data.refreshToken);
+    if (data.user?.secret_key) {
+      localStorage.setItem('secretKey', data.user.secret_key);
+    }
     setUser(data.user);
     return data;
   };
@@ -49,6 +55,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('secretKey');
     setUser(null);
   };
 

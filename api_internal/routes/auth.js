@@ -14,7 +14,8 @@ const router = express.Router();
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_CALLBACK_URL
+    callbackURL: process.env.GOOGLE_CALLBACK_URL,
+    state: false
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
@@ -103,7 +104,7 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
     const refreshToken = jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN });
 
-    delete user.secret_key; // Never send secret key to frontend
+    // Keep secret_key so user can store it locally for E2EE
     
     console.log('✅ User registered successfully:', email, 'UserID:', userId);
     res.status(201).json({ user, token, refreshToken });
@@ -151,7 +152,7 @@ router.post('/login', async (req, res) => {
     const refreshToken = jwt.sign({ userId: user.id }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN });
 
     delete user.password_hash;
-    delete user.secret_key; // Never send secret key to frontend
+    // Keep secret_key so user can store it locally for E2EE
     
     // Ensure public_key exists
     if (!user.public_key) {
@@ -162,6 +163,7 @@ router.post('/login', async (req, res) => {
         [keyPair.publicKey, keyPair.secretKey, user.id]
       );
       user.public_key = keyPair.publicKey;
+      user.secret_key = keyPair.secretKey;
     }
     
     console.log('✅ Login successful for user:', email);
@@ -215,11 +217,11 @@ router.get('/me', authenticate, async (req, res) => {
 
 // Google OAuth Routes
 router.get('/oauth/google', 
-  passport.authenticate('google', { scope: ['profile', 'email'] })
+  passport.authenticate('google', { scope: ['profile', 'email'], session: false })
 );
 
 router.get('/oauth/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
+  passport.authenticate('google', { failureRedirect: '/login', session: false }),
   (req, res) => {
     try {
       // Generate JWT tokens for the authenticated user
@@ -234,15 +236,14 @@ router.get('/oauth/google/callback',
         { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN }
       );
 
-      // Remove sensitive data
+      // Remove sensitive data (but keep secret_key for redirect)
       const user = { ...req.user };
       delete user.password_hash;
-      delete user.secret_key;
 
       // Redirect to frontend with tokens (supports frontend on any dev port)
       const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
       const frontendHost = process.env.FRONTEND_URL || 'localhost:5173';
-      const redirectUrl = `${protocol}://${frontendHost}/oauth-callback?token=${token}&refreshToken=${refreshToken}&userId=${user.id}&email=${user.email}&name=${user.name}&publicKey=${user.public_key}`;
+      const redirectUrl = `${protocol}://${frontendHost}/oauth-callback?token=${token}&refreshToken=${refreshToken}&userId=${user.id}&email=${user.email}&name=${user.name}&publicKey=${user.public_key}&secretKey=${user.secret_key}`;
       res.redirect(redirectUrl);
     } catch (error) {
       console.error('OAuth callback error:', error);

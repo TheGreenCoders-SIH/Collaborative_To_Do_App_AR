@@ -17,6 +17,7 @@ const OAuthCallbackPage = () => {
         const email = searchParams.get('email');
         const name = searchParams.get('name');
         const publicKey = searchParams.get('publicKey');
+        const secretKey = searchParams.get('secretKey');
 
         if (!token || !refreshToken) {
           setError('Authentication failed: Missing tokens');
@@ -27,6 +28,11 @@ const OAuthCallbackPage = () => {
         // Store tokens
         localStorage.setItem('token', token);
         localStorage.setItem('refreshToken', refreshToken);
+
+        // Store secret key for E2EE if available
+        if (secretKey) {
+          localStorage.setItem('secretKey', secretKey);
+        }
 
         // Store user data
         const user = {

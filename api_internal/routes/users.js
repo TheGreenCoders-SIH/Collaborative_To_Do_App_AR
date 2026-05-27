@@ -139,7 +139,7 @@ router.get('/search', authenticate, async (req, res) => {
 
     // Only search by exact email match or exact user_id match
     const result = await pool.query(
-      `SELECT id, email, name, user_id, avatar_url FROM users 
+      `SELECT id, email, name, user_id, avatar_url, public_key FROM users 
        WHERE (LOWER(email) = LOWER($1) OR UPPER(user_id) = UPPER($1)) 
        AND id != $2
        LIMIT 10`,

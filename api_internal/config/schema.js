@@ -48,6 +48,17 @@ const initializeDatabase = async () => {
       await client.query('ALTER TABLE users ADD COLUMN secret_key TEXT');
     }
 
+    // Check if nonce column exists in messages table, if not add it
+    const nonceExists = await client.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name='messages' AND column_name='nonce'
+    `);
+    
+    if (nonceExists.rows.length === 0) {
+      console.log('➕ Adding nonce column to messages table');
+      await client.query('ALTER TABLE messages ADD COLUMN nonce TEXT');
+    }
+
     // Check if user_id column exists, if not add it
     const userIdExists = await client.query(`
       SELECT column_name FROM information_schema.columns 
@@ -199,6 +210,7 @@ const initializeDatabase = async () => {
         conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
         sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         encrypted_content TEXT NOT NULL,
+        nonce TEXT,
         status VARCHAR(20) DEFAULT 'sent',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

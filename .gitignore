@@ -41,3 +41,6 @@ Thumbs.db
 # Optional: User uploads (since you have an 'uploads' folder in backend)
 backend/uploads/*
 !backend/uploads/.gitkeepbut
+
+# Antigravity agent files
+brain/
