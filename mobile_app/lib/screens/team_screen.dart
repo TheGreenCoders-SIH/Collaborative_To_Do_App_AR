@@ -580,60 +580,98 @@ class _TeamScreenState extends State<TeamScreen> {
   void _showAddMemberDialog() {
     final emailController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    bool isInviting = false;
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: Theme.of(context).cardColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Invite Member', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-          content: Form(
-            key: formKey,
-            child: TextFormField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: "Member's Email",
-                hintText: 'user@example.com',
-                prefixIcon: Icon(Icons.mail_outline),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Email is required';
-                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                  return 'Invalid email';
-                }
-                return null;
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: TextStyle(color: Colors.grey[400])),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Theme.of(context).cardColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text('Invite Member', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+              content: Form(
+                key: formKey,
+                child: TextFormField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: "Member's Email",
+                    hintText: 'user@example.com',
+                    prefixIcon: Icon(Icons.mail_outline),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Email is required';
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                      return 'Invalid email';
+                    }
+                    return null;
+                  },
                 ),
-                onPressed: () {
-                  if (!formKey.currentState!.validate()) return;
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Invite sent to ${emailController.text} (Synced via DB)')),
-                  );
-                },
-                child: Text('Invite', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white)),
               ),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: isInviting ? null : () => Navigator.pop(context),
+                  child: Text('Cancel', style: TextStyle(color: Colors.grey[400])),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    ),
+                    onPressed: isInviting
+                        ? null
+                        : () async {
+                            if (!formKey.currentState!.validate()) return;
+                            setDialogState(() => isInviting = true);
+                            try {
+                              final email = emailController.text.trim();
+                              final res = await ApiService.addTeamMember(_team['id'], email);
+                              if (res['success'] == true) {
+                                if (mounted) {
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Successfully added $email to the team!')),
+                                  );
+                                }
+                              } else {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(res['error'] ?? 'Failed to add member')),
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: $e')),
+                                );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setDialogState(() => isInviting = false);
+                              }
+                            }
+                          },
+                    child: isInviting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text('Invite', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white)),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );

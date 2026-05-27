@@ -141,6 +141,21 @@ class ApiService {
     return jsonDecode(response.body);
   }
 
+  static Future<Map<String, dynamic>> addTeamMember(int teamId, String email) async {
+    final baseUrl = await getBaseUrl();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/teams/$teamId/members'),
+      headers: await _getHeaders(),
+      body: jsonEncode({'email': email}),
+    );
+    final data = jsonDecode(response.body);
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      return {'success': true, 'message': data['message'] ?? 'Member added successfully'};
+    } else {
+      return {'success': false, 'error': data['error'] ?? 'Failed to add member'};
+    }
+  }
+
   // --- TASKS ENDPOINTS ---
   static Future<List<dynamic>> fetchTasks(int teamId) async {
     final baseUrl = await getBaseUrl();
