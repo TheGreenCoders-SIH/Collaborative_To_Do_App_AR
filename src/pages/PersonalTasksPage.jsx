@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useTeam } from '../hooks/useTeam';
@@ -13,30 +13,81 @@ const PersonalTasksPage = () => {
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
   
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 3, 1));
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
-  const [tasks, setTasks] = useState([
-    { id: 1, date: '2024-04-01', title: 'Morning Exercise', completed: true },
-    { id: 2, date: '2024-04-01', title: 'Read 30 minutes', completed: true },
-    { id: 3, date: '2024-04-02', title: 'Meditation', completed: true },
-    { id: 4, date: '2024-04-02', title: 'Drink 8 glasses of water', completed: true },
-    { id: 5, date: '2024-04-03', title: 'No screen time before 10am', completed: true },
-    { id: 6, date: '2024-04-03', title: 'Practice coding', completed: true },
-    { id: 7, date: '2024-04-05', title: 'Morning run', completed: true },
-    { id: 8, date: '2024-04-05', title: 'Healthy breakfast', completed: true },
-    { id: 9, date: '2024-04-06', title: 'Learn new skill', completed: true },
-    { id: 10, date: '2024-04-08', title: 'Journal writing', completed: true },
-    { id: 11, date: '2024-04-09', title: 'Yoga session', completed: true },
-    { id: 12, date: '2024-04-10', title: 'No social media day', completed: true },
-    { id: 13, date: '2024-04-12', title: 'Deep work 4 hours', completed: true },
-    { id: 14, date: '2024-04-13', title: 'Call family', completed: true },
-    { id: 15, date: '2024-04-14', title: 'Review goals', completed: false },
-  ]);
+  
+  // Scoped to the logged-in user ID
+  const [tasks, setTasks] = useState(() => {
+    if (user && user.id) {
+      const saved = localStorage.getItem(`personal_tasks_${user.id}`);
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+  
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [streak] = useState(7);
   const [selectedTeam, setSelectedTeam] = useState('dashboard');
+
+  // Persist tasks in localStorage whenever they change
+  useEffect(() => {
+    if (user && user.id) {
+      localStorage.setItem(`personal_tasks_${user.id}`, JSON.stringify(tasks));
+    }
+  }, [tasks, user]);
+
+  // Calculate user streak dynamically
+  const calculateStreak = (tasksList) => {
+    if (!tasksList || tasksList.length === 0) return 0;
+    
+    // Group tasks by date and check completion status
+    const dateCompletion = {};
+    tasksList.forEach(t => {
+      if (!dateCompletion[t.date]) {
+        dateCompletion[t.date] = { total: 0, completed: 0 };
+      }
+      dateCompletion[t.date].total += 1;
+      if (t.completed) {
+        dateCompletion[t.date].completed += 1;
+      }
+    });
+
+    let streakCount = 0;
+    let checkDate = new Date();
+    checkDate.setHours(0, 0, 0, 0);
+
+    while (true) {
+      const year = checkDate.getFullYear();
+      const month = String(checkDate.getMonth() + 1).padStart(2, '0');
+      const day = String(checkDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
+      const dayData = dateCompletion[dateStr];
+      if (dayData && dayData.total > 0 && dayData.completed === dayData.total) {
+        streakCount++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        if (streakCount === 0) {
+          checkDate.setDate(checkDate.getDate() - 1);
+          const yesterdayYear = checkDate.getFullYear();
+          const yesterdayMonth = String(checkDate.getMonth() + 1).padStart(2, '0');
+          const yesterdayDay = String(checkDate.getDate()).padStart(2, '0');
+          const yesterdayDateStr = `${yesterdayYear}-${yesterdayMonth}-${yesterdayDay}`;
+          const yesterdayData = dateCompletion[yesterdayDateStr];
+          if (yesterdayData && yesterdayData.total > 0 && yesterdayData.completed === yesterdayData.total) {
+            streakCount++;
+            checkDate.setDate(checkDate.getDate() - 1);
+            continue;
+          }
+        }
+        break;
+      }
+    }
+    return streakCount;
+  };
+
+  const streak = calculateStreak(tasks);
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -49,7 +100,9 @@ const PersonalTasksPage = () => {
   const { firstDay, daysInMonth } = getDaysInMonth(currentDate);
 
   const getTasksForDate = (day) => {
-    const dateStr = `2024-04-${String(day).padStart(2, '0')}`;
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
     return tasks.filter(t => t.date === dateStr);
   };
 
@@ -192,7 +245,10 @@ const PersonalTasksPage = () => {
                   const dayTasks = getTasksForDate(day);
                   const dayCompleted = dayTasks.filter(t => t.completed).length;
                   const hasCompletedAll = dayTasks.length > 0 && dayCompleted === dayTasks.length;
-                  const dateStr = `2024-04-${String(day).padStart(2, '0')}`;
+                  
+                  const year = currentDate.getFullYear();
+                  const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+                  const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
 
                   return (
                     <button
