@@ -6,6 +6,29 @@ import { HiPaperClip, HiPhotograph, HiEmojiHappy, HiPaperAirplane, HiSearch, HiP
 import { Modal } from '../common';
 import EmojiPicker from 'emoji-picker-react';
 import { encryptMessage, decryptMessage } from '../../utils/encryption';
+const parseLinks = (text) => {
+  if (!text) return '';
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  const parts = text.split(urlRegex);
+  return parts.map((part, index) => {
+    if (urlRegex.test(part)) {
+      const href = part.startsWith('http') ? part : `https://${part}`;
+      return (
+        <a
+          key={index}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-cyan-400 underline hover:text-cyan-300 break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
 
 export default function ChatArea({ activeChat, currentUser, socket, onBack, showRightSidebar, onToggleRightSidebar }) {
   const [messages, setMessages] = useState([]);
@@ -717,7 +740,7 @@ export default function ChatArea({ activeChat, currentUser, socket, onBack, show
                       )}
                     </div>
                     <div className="message-bubble">
-                      {displayContent}
+                      {parseLinks(displayContent)}
                       {fileAttachment && (
                         <div style={{ marginTop: 8, padding: 10, background: 'rgba(255,255,255,0.05)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: 10 }}>
                           <HiPaperClip size={20} className="text-cyan-400" />

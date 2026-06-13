@@ -4,3 +4,4 @@ export { default as Modal } from './Modal';
 export { default as Card } from './Card';
 export { default as TaskCard } from './TaskCard';
 export { default as Sidebar } from './Sidebar';
+export { default as NotificationBell } from './NotificationBell';

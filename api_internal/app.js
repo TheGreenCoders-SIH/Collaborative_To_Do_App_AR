@@ -45,6 +45,7 @@ const attachmentRoutes = require('./routes/attachments');
 const activityRoutes = require('./routes/activity');
 const messageRoutes = require('./routes/messages');
 const channelRoutes = require('./routes/channels');
+const notificationRoutes = require('./routes/notifications');
 
 // Consolidation of routes for Vercel/Local compatibility
 const apiRouter = express.Router();
@@ -59,6 +60,8 @@ apiRouter.use('/attachments', attachmentRoutes);
 apiRouter.use('/', activityRoutes);
 apiRouter.use('/', channelRoutes);
 apiRouter.use('/messages', messageRoutes);
+apiRouter.use('/notifications', notificationRoutes);
+
 
 // Mount the router at both /api (for Vercel) and / (for local proxy/direct access)
 app.use('/api', apiRouter);

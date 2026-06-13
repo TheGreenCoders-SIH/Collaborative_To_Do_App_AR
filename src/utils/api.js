@@ -135,4 +135,11 @@ export const messaging = {
   sendTeamMessage: (teamId, content) => api.post(`/messages/team/${teamId}`, { content }),
 };
 
+export const notifications = {
+  list: () => api.get('/notifications'),
+  read: (id) => api.post(`/notifications/${id}/read`),
+  readAll: () => api.post('/notifications/read-all'),
+  delete: (id) => api.delete(`/notifications/${id}`)
+};
+
 export default api;

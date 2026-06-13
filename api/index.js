@@ -19,6 +19,11 @@ const io = socketIO(server, {
 const connectedUsers = new Map();     // userId -> socket.id
 const socketIdToUser = new Map();     // socket.id -> userId
 
+// Expose socket.io objects to express app for routes access
+app.set('io', io);
+app.set('connectedUsers', connectedUsers);
+
+
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 

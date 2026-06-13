@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useTeam } from '../hooks/useTeam';
 import { useTheme } from '../context/ThemeContext';
-import { Button, Input, Modal, Card } from '../components/common';
+import { Button, Input, Modal, Card, NotificationBell } from '../components/common';
 import Sidebar from '../components/common/Sidebar';
 import EditProfileModal from '../components/messaging/EditProfileModal';
 import { HiPlus, HiChevronRight, HiCalendar, HiUsers } from 'react-icons/hi';
@@ -85,13 +85,14 @@ const DashboardPage = () => {
               </div>
             </div>
 
-            {/* User Profile */}
-            <div 
-              className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => setShowEditProfile(true)}
-              title="Edit Profile"
-            >
-              <div className="flex items-center gap-3">
+            {/* Notifications & User Profile */}
+            <div className="flex items-center gap-4">
+              <NotificationBell />
+              <div 
+                className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setShowEditProfile(true)}
+                title="Edit Profile"
+              >
                 {user?.avatar_url ? (
                   <img
                     src={user.avatar_url}
@@ -116,6 +117,7 @@ const DashboardPage = () => {
                   </p>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </header>

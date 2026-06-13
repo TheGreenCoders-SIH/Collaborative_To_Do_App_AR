@@ -36,11 +36,13 @@ router.post('/teams/:teamId/tasks', authenticate, async (req, res) => {
       const task = taskResult.rows[0];
 
       if (assigned_to && assigned_to.length > 0) {
+        const { createNotification } = require('../utils/notifications');
         for (const userId of assigned_to) {
           await client.query(
             'INSERT INTO task_assignments (task_id, user_id) VALUES ($1, $2)',
             [task.id, userId]
           );
+          await createNotification(req.app, userId, 'New Task Assigned', `You have been assigned to task: "${title}"`, 'task_assigned');
         }
       }
 
@@ -289,6 +291,30 @@ router.put('/tasks/:id/status', authenticate, async (req, res) => {
       [status, id]
     );
 
+    // Send notifications for status change
+    const { createNotification } = require('../utils/notifications');
+    const updaterId = req.user.id;
+    const creatorId = task.created_by;
+    const taskTitle = task.title;
+    const statusLabels = {
+      'todo': 'To Do',
+      'in_progress': 'In Progress',
+      'pending_approval': 'Pending Approval',
+      'complete': 'Complete'
+    };
+    const statusText = statusLabels[status] || status;
+
+    if (creatorId && creatorId !== updaterId) {
+      await createNotification(req.app, creatorId, 'Task Status Updated', `Task "${taskTitle}" status changed to "${statusText}"`, 'task_status');
+    }
+
+    const assignees = await pool.query('SELECT user_id FROM task_assignments WHERE task_id = $1', [id]);
+    for (const row of assignees.rows) {
+      if (row.user_id !== updaterId && row.user_id !== creatorId) {
+        await createNotification(req.app, row.user_id, 'Task Status Updated', `Task "${taskTitle}" status changed to "${statusText}"`, 'task_status');
+      }
+    }
+
     await pool.query(
       `INSERT INTO activity_logs (team_id, user_id, action, resource_type, resource_id, metadata)
        VALUES ($1, $2, 'status_changed', 'task', $3, $4)`,
@@ -368,6 +394,10 @@ router.post('/tasks/:id/assign', authenticate, async (req, res) => {
       'INSERT INTO task_assignments (task_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
       [id, user_id]
     );
+
+    // Create in-app notification
+    const { createNotification } = require('../utils/notifications');
+    await createNotification(req.app, user_id, 'New Task Assigned', `You have been assigned to task: "${task.title}"`, 'task_assigned');
 
     res.json({ message: 'User assigned to task' });
   } catch (error) {

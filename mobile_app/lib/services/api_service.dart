@@ -373,4 +373,45 @@ class ApiService {
     );
     return jsonDecode(response.body);
   }
+
+  // --- NOTIFICATIONS ENDPOINTS ---
+  static Future<List<dynamic>> fetchNotifications() async {
+    final baseUrl = await getBaseUrl();
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/notifications'),
+      headers: await _getHeaders(),
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['notifications'] ?? [];
+    }
+    return [];
+  }
+
+  static Future<Map<String, dynamic>> markNotificationRead(int id) async {
+    final baseUrl = await getBaseUrl();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/notifications/$id/read'),
+      headers: await _getHeaders(),
+    );
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> markAllNotificationsRead() async {
+    final baseUrl = await getBaseUrl();
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/notifications/read-all'),
+      headers: await _getHeaders(),
+    );
+    return jsonDecode(response.body);
+  }
+
+  static Future<Map<String, dynamic>> deleteNotification(int id) async {
+    final baseUrl = await getBaseUrl();
+    final response = await http.delete(
+      Uri.parse('$baseUrl/api/notifications/$id'),
+      headers: await _getHeaders(),
+    );
+    return jsonDecode(response.body);
+  }
 }

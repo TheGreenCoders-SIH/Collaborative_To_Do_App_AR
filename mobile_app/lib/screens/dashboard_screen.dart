@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/notification_center.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -18,11 +20,86 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<dynamic> _teams = [];
   bool _isLoading = true;
   int _currentNavIndex = 0;
+  List<dynamic> _notifications = [];
+  Timer? _notificationTimer;
 
   @override
   void initState() {
     super.initState();
     _loadDashboardData();
+    _loadNotifications(initial: true);
+    _startNotificationPolling();
+  }
+
+  void _startNotificationPolling() {
+    _notificationTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      _loadNotifications(initial: false);
+    });
+  }
+
+  Future<void> _loadNotifications({bool initial = false}) async {
+    try {
+      final fetched = await ApiService.fetchNotifications();
+      
+      // Look for new unread notifications to show in-app banner/snackBar
+      if (!initial && _notifications.isNotEmpty) {
+        final newUnread = fetched.where((n) {
+          final isUnread = n['read'] == false;
+          final isNew = !_notifications.some((old) => old['id'] == n['id']);
+          return isUnread && isNew;
+        }).toList();
+
+        if (newUnread.isNotEmpty) {
+          final latest = newUnread.first;
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      latest['title'] ?? 'New Notification',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      latest['message'] ?? '',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(fontSize: 12, color: Colors.white.withOpacity(0.9)),
+                    ),
+                  ],
+                ),
+                backgroundColor: AppColors.darkCard,
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                action: SnackBarAction(
+                  label: 'View',
+                  textColor: AppColors.primaryCyan,
+                  onPressed: () => NotificationCenter.show(context),
+                ),
+              ),
+            );
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _notifications = fetched;
+        });
+      }
+    } catch (e) {
+      print('Error loading notifications in dashboard: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _notificationTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadDashboardData() async {
@@ -182,6 +259,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 22, letterSpacing: 0.5),
         ),
         actions: [
+          Builder(
+            builder: (context) {
+              final unreadCount = _notifications.where((n) => n['read'] == false).length;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_none_rounded, size: 26),
+                    onPressed: () => NotificationCenter.show(context),
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.dangerRed,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            }
+          ),
           IconButton(
             icon: Icon(themeProvider.isDarkMode ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
             onPressed: () => themeProvider.toggleTheme(),

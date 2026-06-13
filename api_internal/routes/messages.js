@@ -183,6 +183,13 @@ router.post('/messages', authenticate, async (req, res) => {
       [conversation_id]
     );
 
+    // Create in-app notification for recipient
+    const { createNotification } = require('../utils/notifications');
+    const recipientId = convCheck.rows[0].user_id_1 === sender_id ? convCheck.rows[0].user_id_2 : convCheck.rows[0].user_id_1;
+    const senderResult = await pool.query('SELECT name FROM users WHERE id = $1', [sender_id]);
+    const senderName = senderResult.rows[0]?.name || 'Someone';
+    await createNotification(req.app, recipientId, 'New Message', `You received a secure message from ${senderName}`, 'dm');
+
     res.status(201).json({ message: result.rows[0] });
   } catch (error) {
     console.error('Error sending message:', error.message);
@@ -330,6 +337,17 @@ router.post('/team/:teamId', authenticate, async (req, res) => {
       'SELECT name, avatar_url, user_id FROM users WHERE id = $1',
       [senderId]
     );
+
+    // Create in-app notifications for other team members
+    const { createNotification } = require('../utils/notifications');
+    const teamResult = await pool.query('SELECT name FROM teams WHERE id = $1', [teamId]);
+    const teamName = teamResult.rows[0]?.name || 'Team';
+    const membersResult = await pool.query('SELECT user_id FROM team_members WHERE team_id = $1 AND user_id != $2', [teamId, senderId]);
+    const senderName = userResult.rows[0]?.name || 'Someone';
+    const truncatedMsg = content.trim().length > 60 ? content.trim().substring(0, 60) + '...' : content.trim();
+    for (const row of membersResult.rows) {
+      await createNotification(req.app, row.user_id, 'New Team Message', `#${teamName} - ${senderName}: ${truncatedMsg}`, 'team_message');
+    }
 
     const message = {
       ...result.rows[0],

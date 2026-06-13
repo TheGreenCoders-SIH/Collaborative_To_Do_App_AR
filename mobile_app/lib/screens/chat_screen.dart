@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:pinenacl/x25519.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/nacl_service.dart';
@@ -385,13 +387,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
                     ),
                   ),
-                  child: Text(
-                    decrypted,
-                    style: GoogleFonts.inter(
-                      fontSize: 13.5,
-                      color: isDark ? Colors.white : AppColors.lightText,
-                    ),
-                  ),
+                  child: _buildMessageContent(decrypted, isDark, isMe),
                 ),
               ),
 
@@ -502,6 +498,78 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMessageContent(String text, bool isDark, bool isMe) {
+    final RegExp urlRegExp = RegExp(
+      r'(https?:\/\/[^\s]+|www\.[^\s]+)',
+      caseSensitive: false,
+    );
+
+    final List<InlineSpan> spans = [];
+    int start = 0;
+
+    urlRegExp.allMatches(text).forEach((match) {
+      if (match.start > start) {
+        spans.add(TextSpan(
+          text: text.substring(start, match.start),
+          style: GoogleFonts.inter(
+            fontSize: 13.5,
+            color: isDark ? Colors.white : AppColors.lightText,
+          ),
+        ));
+      }
+
+      final String urlText = match.group(0)!;
+      final String urlHref = urlText.startsWith('http') ? urlText : 'https://$urlText';
+
+      spans.add(TextSpan(
+        text: urlText,
+        style: GoogleFonts.inter(
+          fontSize: 13.5,
+          color: isMe ? AppColors.primaryCyan : Colors.cyan[300],
+          decoration: TextDecoration.underline,
+          fontWeight: FontWeight.w600,
+        ),
+        recognizer: TapGestureRecognizer()
+          ..onTap = () async {
+            final Uri uri = Uri.parse(urlHref);
+            try {
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            } catch (e) {
+              print('Could not launch URL: $e');
+            }
+          },
+      ));
+
+      start = match.end;
+    });
+
+    if (start < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(start),
+        style: GoogleFonts.inter(
+          fontSize: 13.5,
+          color: isDark ? Colors.white : AppColors.lightText,
+        ),
+      ));
+    }
+
+    if (spans.isEmpty) {
+      spans.add(TextSpan(
+        text: text,
+        style: GoogleFonts.inter(
+          fontSize: 13.5,
+          color: isDark ? Colors.white : AppColors.lightText,
+        ),
+      ));
+    }
+
+    return RichText(
+      text: TextSpan(children: spans),
     );
   }
 }

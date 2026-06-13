@@ -2,6 +2,30 @@ import React, { useEffect, useRef } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { HiCheck, HiCheckCircle } from 'react-icons/hi';
 
+const parseLinks = (text) => {
+  if (!text) return '';
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  const parts = text.split(urlRegex);
+  return parts.map((part, index) => {
+    if (urlRegex.test(part)) {
+      const href = part.startsWith('http') ? part : `https://${part}`;
+      return (
+        <a
+          key={index}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-cyan-400 underline hover:text-cyan-300 break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 export default function MessageList({ messages, currentUserId, isTyping = false, typingUserName = null }) {
   const { isDarkMode } = useTheme();
   const messagesEndRef = useRef(null);
@@ -80,7 +104,7 @@ export default function MessageList({ messages, currentUserId, isTyping = false,
                   : 'bg-gray-100 text-gray-900 rounded-bl-none'
               }`}>
                 <p className="text-sm whitespace-pre-wrap">
-                  {msg.content || msg.encrypted_content}
+                  {parseLinks(msg.content || msg.encrypted_content)}
                 </p>
               </div>
 

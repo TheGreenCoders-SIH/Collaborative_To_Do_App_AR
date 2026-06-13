@@ -64,6 +64,12 @@ router.post('/request', authenticate, async (req, res) => {
       [requesterId, addressee_id]
     );
 
+    // Create in-app notification
+    const { createNotification } = require('../utils/notifications');
+    const requesterResult = await pool.query('SELECT name FROM users WHERE id = $1', [requesterId]);
+    const requesterName = requesterResult.rows[0]?.name || 'Someone';
+    await createNotification(req.app, addressee_id, 'New Friend Request', `${requesterName} sent you a friend request.`, 'friend_request');
+
     res.status(201).json({ message: 'Friend request sent', status: 'pending' });
   } catch (error) {
     console.error('Friend request error:', error);
@@ -100,6 +106,14 @@ router.put('/respond', authenticate, async (req, res) => {
       'UPDATE friendships SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
       [newStatus, friendship_id]
     );
+
+    if (action === 'accept') {
+      const { createNotification } = require('../utils/notifications');
+      const respondentResult = await pool.query('SELECT name FROM users WHERE id = $1', [userId]);
+      const respondentName = respondentResult.rows[0]?.name || 'Someone';
+      const requesterId = friendship.rows[0].requester_id;
+      await createNotification(req.app, requesterId, 'Friend Request Accepted', `${respondentName} accepted your friend request.`, 'friend_accept');
+    }
 
     res.json({ message: `Friend request ${newStatus}`, status: newStatus });
   } catch (error) {
